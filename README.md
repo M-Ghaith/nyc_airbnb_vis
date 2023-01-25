@@ -15,7 +15,7 @@ Plotly and Dash for building the interactive dashboard
 Pandas for loading and handling the dataset
 A Mapbox access token
 
-##Installing
+## Installing
 
 Clone the repository
 `git clone https://github.com/M-Ghaith/nyc-airbnb-vis.git`
@@ -41,8 +41,6 @@ Plotly - (https://plotly.com/) - Used for creating the interactive map and bar g
 Pandas - Used for loading and handling the dataset
 Mapbox - Used for providing the map tiles and locations data
 
-## Authors
-Ghaith 
 
 ## Note
 The dataset used in this project is just a sample data and doesn't reflect the actual data from the Airbnb website, thus the prices and reviews may not be accurate.
