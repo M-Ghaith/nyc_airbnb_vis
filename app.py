@@ -110,7 +110,7 @@ def update_graph(neighborhood, price_range, room_type):
 	        ),
 	        pitch=5,
 	        zoom=zoom,
-			transition = {'duration': 1000, 'easing': 'cubic-in-out'}
+			
 	    ),
 	)
 
