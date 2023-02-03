@@ -11,9 +11,9 @@ Bar graph that displays the distribution of room types
 
 ## Prerequisites
 
-Plotly and Dash for building the interactive dashboard
-Pandas for loading and handling the dataset
-A Mapbox access token
+1. Plotly and Dash for building the interactive dashboard
+2. Pandas for loading and handling the dataset
+3. A Mapbox access token
 
 ## Installing
 

@@ -1,3 +1,4 @@
+# Essentail libraries
 import dash
 from dash import html, dcc
 import plotly.graph_objs as go
@@ -5,24 +6,36 @@ from dash.dependencies import Input, Output
 import dash_bootstrap_components as dbc
 import plotly.express as px
 
+# Import the dataset from "data" file
 from data import *
+
+# Import graphs from views
+from graphs.borough_neighbourhood_count import *
+from graphs.map import *
+from graphs.room_types import *
+from graphs.minimum_nights import *
+from graphs.cancellation_policy import *
+from graphs.pcp_graph import *
+
 
 mapbox_access_token = "pk.eyJ1IjoiZ2hhaXRoOTMiLCJhIjoiY2xkM2RkZXE5MGg5bTNvbDBpdnF3YmtpYyJ9.4AMiIng35KKFYqZ9jD3a9Q"
 
 app = dash.Dash(external_stylesheets=[dbc.themes.LUX])
 
+
 app.layout = html.Div([
-	#Header
+	# Header
 	html.Header([
 		html.Div([
 			html.Div([
 				html.H6("Filter by:"),
-				dcc.Dropdown(
+				dcc.Dropdown( # Dropdown for selecting neighborhood
 					id='neighborhood-dropdown',
 					options=borough,
 					value='New York'
 				),
-				#Numeric data
+				
+				# Numeric data: total listings, remaining listings, and average price.
 				html.Div([
 					html.H4(id="total_listing"),
 					html.P(id = "out_of_total")
@@ -36,7 +49,7 @@ app.layout = html.Div([
 
 			html.Div([
 				html.Div([
-					dcc.RadioItems(
+					dcc.RadioItems( # Radio buttons for room type
 						id='room-type-radio',
 						options=room_type,
 						value=room_type[0],
@@ -67,7 +80,6 @@ app.layout = html.Div([
 	]),
 		
 	
-	#Body
     html.Div([        
         html.Div([            
             dcc.Graph(id='map')        
@@ -112,148 +124,46 @@ app.layout = html.Div([
 )
 
 def update_graph(neighborhood, price_range, room_type):
+	# Assign the original data frame to the filtered data frame
 	filtered_df = df
+	# Get the latitude, longitude, and zoom level for the selected neighborhood from the borough_coordinates dictionary from data file
 	lat, lon, zoom = borough_coordinates[neighborhood]
+
+	# If the selected neighborhood is not 'New York', filter the data frame to only include listings from that neighborhood
 	if neighborhood != 'New York':
 		filtered_df = filtered_df[filtered_df['borough'] == neighborhood]
-		lat, lon, zoom= borough_coordinates[neighborhood]
+		lat, lon, zoom= borough_coordinates[neighborhood] 	# Update the latitude, longitude, and zoom level to match the selected neighborhood
+	# If the selected price range is not the minimum price in the original data frame, filter the data frame to only include listings within that price range
 	if price_range != df['price'].min():
 		filtered_df = filtered_df[filtered_df.price.between(price_range, df['price'].max())]
-	if room_type != 'Any':
+	# If the selected room type is not 'Any', filter the data frame to only include listings with that room type
+	if room_type != 'Any': 
 		filtered_df = filtered_df[filtered_df['room_type'] == room_type]
 
 	#Numerical data
 	total_listing = "Total: {:,}".format(filtered_df.shape[0])
 	out_of_total = "out of {:,} ({:.2f}%)".format(df.shape[0], (filtered_df.shape[0]/df.shape[0])*100)
-	average_price = "Average price: {:.2f}".format(filtered_df.price.mean())
+	average_price = "Average price: ${:.2f}".format(filtered_df.price.mean())
 
 	# Create borough neighbourhood counts graph
-	borough_neighbourhood_counts = filtered_df.groupby(['borough', 'neighbourhood']).size().reset_index()
-	borough_neighbourhood_counts.columns = ['Borough', 'Neighbourhood', 'Count']
-	borough_neighbourhood_data = [go.Bar(
-		x = borough_neighbourhood_counts['Neighbourhood'],
-		y = borough_neighbourhood_counts['Count'],
-		marker = go.bar.Marker(
-			color = borough_neighbourhood_counts['Borough'].astype('category').cat.codes,
-            colorscale = 'Viridis',
-		),
-		text = borough_neighbourhood_counts['Borough'],
-		textposition = 'auto',
-		hovertext = 'Borough: ' + borough_neighbourhood_counts['Borough'] + '<br>' + 'Neighbourhood: ' + borough_neighbourhood_counts['Neighbourhood'] + '<br>' +'Count: ' + borough_neighbourhood_counts['Count'].astype(str),
-	)]
-	borough_neighbourhood_layout = go.Layout(
-			height = 500, 
-			title = "Listings Counts",
-			margin = dict(l =50, r = 50, t = 50, b = 50),
-		)
-	borough_neighbourhood_graph = go.Figure(data = borough_neighbourhood_data, layout = borough_neighbourhood_layout)
-	
+	borough_neighbourhood_graph = borough_neighbourhood_count(filtered_df)
+
 	# Create a map of the listings
-	data = [go.Scattermapbox(
-	    lat=filtered_df["lat"],
-	    lon=filtered_df["long"],
-	    mode="markers",
-	    marker=go.scattermapbox.Marker(
-	        size = 4,
-			sizemode = 'diameter',
-			sizeref = 0.1,
-	       	color = filtered_df["review_rate_number"],
-	        colorscale = 'Viridis',
-	        colorbar = dict(thickness = 10, title = "Review rate"),
-	        opacity = 0.7
-	    ),
-	    text = filtered_df.name
-
-	)]
-	layout = go.Layout(
-		width=1000,
-    	height=650,
-    	autosize=False,
-	    hovermode="closest",
-		margin = dict(l = 10, r = 10, t = 10, b = 10),
-	    mapbox=go.layout.Mapbox(
-	        accesstoken=mapbox_access_token,
-	        bearing=0,
-	        center=go.layout.mapbox.Center(
-	            lat=lat,
-	            lon=lon
-	        ),
-	        pitch=5,
-	        zoom=zoom,
-			
-	    ),
-	)
-	figure = go.Figure(data=data, layout=layout)
-
+	map_figure = map_listings(filtered_df, lat, lon, mapbox_access_token, zoom)
+	
 	# Create a bar chart of the room types
-	room_type_counts = filtered_df.groupby(["room_type", "borough"]).size().reset_index(name='counts')
-	room_type_bar_trace = px.bar(
-			room_type_counts,
-			y="counts",
-			x="room_type",
-			color = "borough",
-			height = 350,
-			title = "Room Type per Borough Count"
-
-		)
-	room_type_bar_layout = go.Layout(	
-		margin = dict(l =50, r = 50, t = 50, b = 50),
-		)
-	room_type_bar_figure = go.Figure(data=room_type_bar_trace, layout=room_type_bar_layout)
+	room_type_bar_figure = room_type_bar(filtered_df)
 
 	# Create a histogram of the Average Minimum Nights per Room Type by Borough
-	df_average_MN_ = filtered_df.groupby(["room_type", "borough"]).agg({"minimum_nights":"mean"}).reset_index()
-	night_average_trace = px.bar(
-		df_average_MN_,
-		x = "room_type",
-		y = "minimum_nights",
-		color = "borough",
-		title='Average Minimum Nights', 
-		height = 350, 
-	)
-	night_average_layout = go.Layout(
-		margin = dict(l =50, r = 50, t = 50, b = 50)
-		)
-	night_average_figure = go.Figure(data=night_average_trace, layout=night_average_layout)
+	night_average_figure = minimum_nights_graph(filtered_df)
 
-	# cancelation_policy_pie_chart
-	colors = ['gold', 'mediumturquoise', 'lightgreen']
-	cancellation_pie_layout = go.Layout(
-		height = 200, 
-		margin = dict(l =50, r = 50, t = 50, b = 50),
-		title="Cancellation Policy"
-		)
+	# Cancelation policy pie chart
+	cancellation_pie = cancellation_policy_graph(filtered_df)
 
-	cancellation_count = filtered_df["cancellation_policy"].value_counts()
-	cancellations = ((cancellation_count/filtered_df.shape[0]) * 100).round(1)
+	# Parallel Coordinates graph showing the relation between "number_of_reviews", "review_rate_number", and "minimum_nights"
+	pcp_review_rate_plot = pcp_review_relation(filtered_df)
 
-	cancellation_pie = go.Figure(
-		data=[go.Pie(
-			labels = filtered_df.cancellation_policy.unique(),
-			values = cancellations
-		)],
-		layout = cancellation_pie_layout
-	)
-	cancellation_pie.update_traces(
-		hoverinfo='label+percent', 
-		textinfo='value', 
-		textfont_size=20,
-        marker=dict(colors=colors, line=dict(color='#000000', width=2))
-		)
-
-	pcp_review_rate_ = px.parallel_coordinates(
-		filtered_df,
-		color = "review_rate_number",
-		dimensions = ["number_of_reviews", "review_rate_number", "minimum_nights"],
-		color_continuous_scale=px.colors.sequential.Plasma,
-		title="Parallel Coordinate Plot of Number of Reviews, Review Rate Number, and Minimum Nights"
-	)
-	pcp_review_rate_plot = go.Figure(data = pcp_review_rate_)
-	return figure, night_average_figure, room_type_bar_figure, total_listing, out_of_total, average_price, cancellation_pie, borough_neighbourhood_graph, pcp_review_rate_plot
+	return map_figure, night_average_figure, room_type_bar_figure, total_listing, out_of_total, average_price, cancellation_pie, borough_neighbourhood_graph, pcp_review_rate_plot
 
 if __name__ == "__main__":
     app.run_server(debug=True)
-
-
-
-
